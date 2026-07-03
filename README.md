@@ -9,8 +9,12 @@ npx serve .
 ```
 Открыть http://localhost:3000 (PWA-функции требуют localhost или HTTPS, просто открыть файл недостаточно).
 
-## Деплой (0 ₽)
-Статика — подойдёт GitHub Pages / Cloudflare Pages / Vercel: залить 4 файла (`index.html`, `manifest.webmanifest`, `sw.js`, `icon.svg`), открыть на телефоне, «Добавить на экран Домой».
+## Продакшн
+**https://alexkashin29.github.io/kurs-med-tracker/** — GitHub Pages из ветки `main` (репо `AlexKashin29/kurs-med-tracker`).
+
+Обновление: правки → `git commit` → `git push` — Pages пересоберётся сам за ~1 мин, PWA подтянет новую версию при следующем открытии (service worker network-first).
+
+На телефоне: открыть ссылку → «Добавить на экран Домой».
 
 ## Что умеет (P0)
 - Аптечка: название, доза/форма, несколько времён приёма, дни недели, старт и длительность курса, остаток в упаковке.

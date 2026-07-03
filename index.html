@@ -157,7 +157,72 @@ function load(){
   try { return Object.assign({meds:[],log:{},notify:false}, JSON.parse(localStorage.getItem(LS)||'{}')); }
   catch(e){ return {meds:[],log:{},notify:false}; }
 }
-function save(){ localStorage.setItem(LS, JSON.stringify(db)); }
+function save(){ localStorage.setItem(LS, JSON.stringify(db)); idbSet('db', db).catch(()=>{}); schedulePushSync(); }
+
+/* ---------- web push (сервер: server/, Cloudflare Worker) ---------- */
+const PUSH = {
+  server: 'https://kurs-push.alekskashin29.workers.dev', // пусто = только локальные уведомления
+  vapid: 'BHIZZXO1VusLwwZJxINaF5jx43oCsfezsaQXraOECtnH9hEYvUpIXN2bYduXF_hymOE_a18qytHln9XInkIWjCo'
+};
+if (PUSH.server.startsWith('PUSH_')) PUSH.server = '';
+
+function idb(){ return new Promise((res,rej)=>{ const r=indexedDB.open('kurs',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('kv');
+  r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+async function idbGet(k){ const d=await idb(); return new Promise((res,rej)=>{
+  const t=d.transaction('kv').objectStore('kv').get(k);
+  t.onsuccess=()=>res(t.result); t.onerror=()=>rej(t.error); }); }
+async function idbSet(k,v){ const d=await idb(); return new Promise((res,rej)=>{
+  const t=d.transaction('kv','readwrite'); t.objectStore('kv').put(v,k);
+  t.oncomplete=()=>res(); t.onerror=()=>rej(t.error); }); }
+
+const b64uToU8 = s => { const b=atob(s.replace(/-/g,'+').replace(/_/g,'/'));
+  return Uint8Array.from(b, c=>c.charCodeAt(0)); };
+
+async function subscribePush(){
+  if (!PUSH.server || !('PushManager' in window)) return;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.subscribe({ userVisibleOnly:true, applicationServerKey: b64uToU8(PUSH.vapid) });
+    db.pushOn = true;
+    await pushSync(sub);
+    save();
+    toast('Push-напоминания включены — придут даже при закрытом приложении');
+  } catch(e){ toast('Push-подписка не удалась'); }
+}
+async function pushSync(sub){
+  if (!PUSH.server || !db.pushOn) return;
+  try {
+    sub = sub || await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+    if (!sub) return;
+    const slotMap = {};
+    for (const m of db.meds) for (const t of m.times){
+      slotMap[t] = slotMap[t] || new Set();
+      (m.days && m.days.length ? m.days : [0,1,2,3,4,5,6]).forEach(d=>slotMap[t].add(d));
+    }
+    const slots = Object.entries(slotMap).map(([time,days])=>({ time, days:[...days].sort((a,b)=>a-b) }));
+    await fetch(PUSH.server+'/subscribe', { method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ sub: sub.toJSON(), slots, tz: -new Date().getTimezoneOffset() }) });
+  } catch(e){}
+}
+let pushT = null;
+function schedulePushSync(){ clearTimeout(pushT); pushT = setTimeout(()=>pushSync(), 1500); }
+
+/* отметки «✓ Принял» из уведомлений (пишутся SW в IndexedDB) */
+async function mergePending(){
+  const pending = await idbGet('pending').catch(()=>null);
+  if (!pending || !pending.length) return;
+  for (const p of pending){
+    db.log[p.date] = db.log[p.date] || {};
+    if (db.log[p.date][p.key] !== 't'){
+      db.log[p.date][p.key] = 't';
+      const med = db.meds.find(m => p.key.startsWith(m.id+'|'));
+      if (med && med.stock != null) med.stock = Math.max(0, med.stock - 1);
+    }
+  }
+  await idbSet('pending', []);
+  save(); render();
+}
 
 let tab = 'today';
 const $ = s => document.querySelector(s);
@@ -407,7 +472,8 @@ async function askNotify(){
   if (!('Notification' in window)) { toast('Уведомления не поддерживаются'); return; }
   const p = await Notification.requestPermission();
   db.notify = p==='granted'; save(); render();
-  toast(db.notify ? 'Уведомления включены 🔔' : 'Уведомления отклонены');
+  if (db.notify){ await subscribePush(); if (!PUSH.server) toast('Уведомления включены 🔔'); }
+  else toast('Уведомления отклонены');
 }
 const notified = new Set(JSON.parse(sessionStorage.getItem('kurs.ntf')||'[]'));
 function tick(){
@@ -443,8 +509,13 @@ $('#overlay').onclick = e=>{ if (e.target.id==='overlay') closeSheet(); };
 window.setStatus = setStatus; window.openForm = openForm; window.addTime = addTime;
 window.saveForm = saveForm; window.delMed = delMed;
 
-if ('serviceWorker' in navigator)
+if ('serviceWorker' in navigator){
   navigator.serviceWorker.register('sw.js').catch(()=>{});
+  navigator.serviceWorker.addEventListener('message', e=>{ if (e.data?.type==='pending') mergePending(); });
+}
+document.addEventListener('visibilitychange', ()=>{ if (!document.hidden) mergePending(); });
+idbSet('db', db).catch(()=>{});
+mergePending();
 
 render();
 setInterval(()=>{ if(tab==='today') render(); }, 60000);

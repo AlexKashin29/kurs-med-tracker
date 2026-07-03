@@ -1,0 +1,13 @@
+name = "kurs-push"
+main = "worker.js"
+compatibility_date = "2026-07-01"
+
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+VAPID_PUBLIC_KEY = "BHIZZXO1VusLwwZJxINaF5jx43oCsfezsaQXraOECtnH9hEYvUpIXN2bYduXF_hymOE_a18qytHln9XInkIWjCo"
+
+[[kv_namespaces]]
+binding = "SUBS"
+id = "80c42621877f40e086e2f3a4e3909be0"
