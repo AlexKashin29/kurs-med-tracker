@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0c1210">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Курс — трекер приёма лекарств</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon.svg">
+<style>
+  :root{
+    --bg:#0c1210; --card:#151d1a; --card2:#1b2622; --line:#243029;
+    --text:#e8f0ec; --dim:#8ba396; --accent:#4ade80; --accent-dim:#173327;
+    --amber:#fbbf24; --red:#f87171; --r:20px;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    background:var(--bg); color:var(--text); min-height:100dvh;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    padding-bottom:calc(84px + env(safe-area-inset-bottom));
+  }
+  .wrap{max-width:520px;margin:0 auto;padding:16px}
+  header{display:flex;align-items:center;justify-content:space-between;padding:8px 0 16px}
+  header h1{font-size:22px;font-weight:800;letter-spacing:-.02em}
+  header h1 span{color:var(--accent)}
+  .icon-btn{background:var(--card);border:1px solid var(--line);color:var(--dim);
+    width:40px;height:40px;border-radius:14px;font-size:18px;cursor:pointer}
+  .icon-btn.on{color:var(--accent);border-color:var(--accent-dim)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;margin-bottom:12px}
+  .muted{color:var(--dim);font-size:13px}
+
+  /* today hero */
+  .hero{display:flex;align-items:center;gap:16px}
+  .ring{width:76px;height:76px;flex:none}
+  .hero .big{font-size:26px;font-weight:800;letter-spacing:-.02em}
+  .streak{margin-left:auto;text-align:right}
+  .streak .big{color:var(--amber)}
+
+  /* dose rows */
+  .tlabel{font-size:12px;font-weight:700;color:var(--dim);text-transform:uppercase;
+    letter-spacing:.08em;margin:18px 4px 8px}
+  .dose{display:flex;align-items:center;gap:12px;background:var(--card);
+    border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-bottom:8px;transition:opacity .2s}
+  .dose .dot{width:12px;height:12px;border-radius:50%;flex:none}
+  .dose .info{flex:1;min-width:0}
+  .dose .name{font-weight:700;font-size:15px}
+  .dose .sub{font-size:12.5px;color:var(--dim);margin-top:2px}
+  .dose .time{font-variant-numeric:tabular-nums;font-weight:700;color:var(--dim);font-size:14px}
+  .dose.taken{opacity:.55}
+  .dose.taken .name{text-decoration:line-through}
+  .act{display:flex;gap:6px}
+  .act button{width:42px;height:42px;border-radius:14px;border:1px solid var(--line);
+    background:var(--card2);color:var(--dim);font-size:17px;cursor:pointer}
+  .act .yes.sel{background:var(--accent);border-color:var(--accent);color:#052}
+  .act .no.sel{background:#3a2020;border-color:#5c2e2e;color:var(--red)}
+  .late{color:var(--red);font-weight:600}
+
+  /* meds */
+  .med{display:flex;align-items:center;gap:12px;cursor:pointer}
+  .med .pill-ic{width:44px;height:44px;border-radius:14px;display:flex;align-items:center;
+    justify-content:center;font-size:20px;flex:none;background:var(--accent-dim)}
+  .bar{height:6px;background:var(--card2);border-radius:3px;margin-top:8px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--accent);border-radius:3px}
+  .warn{color:var(--amber);font-size:12.5px;margin-top:6px}
+
+  /* history */
+  .grid{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:12px}
+  .cell{aspect-ratio:1;border-radius:8px;background:var(--card2);display:flex;
+    align-items:center;justify-content:center;font-size:10px;color:var(--dim)}
+
+  .empty{text-align:center;padding:48px 24px;color:var(--dim)}
+  .empty .emoji{font-size:44px;margin-bottom:12px}
+
+  /* tabbar */
+  nav{position:fixed;bottom:0;left:0;right:0;background:rgba(12,18,16,.92);
+    backdrop-filter:blur(16px);border-top:1px solid var(--line);
+    padding:10px 0 calc(10px + env(safe-area-inset-bottom))}
+  nav .row{max-width:520px;margin:0 auto;display:flex}
+  nav button{flex:1;background:none;border:none;color:var(--dim);font-size:11px;
+    cursor:pointer;display:flex;flex-direction:column;gap:3px;align-items:center;font-weight:600}
+  nav button .i{font-size:20px}
+  nav button.sel{color:var(--accent)}
+
+  .fab{position:fixed;right:calc(50% - 244px);bottom:calc(96px + env(safe-area-inset-bottom));
+    width:56px;height:56px;border-radius:20px;background:var(--accent);color:#052e16;
+    font-size:26px;border:none;cursor:pointer;box-shadow:0 8px 24px rgba(74,222,128,.35);z-index:5}
+  @media (max-width:552px){.fab{right:20px}}
+
+  /* modal */
+  .overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:10;display:none;
+    align-items:flex-end;justify-content:center}
+  .overlay.open{display:flex}
+  .sheet{background:var(--card);border-radius:24px 24px 0 0;width:100%;max-width:520px;
+    max-height:88dvh;overflow-y:auto;padding:20px 20px calc(20px + env(safe-area-inset-bottom))}
+  .sheet h2{font-size:18px;margin-bottom:16px}
+  label{display:block;font-size:12.5px;font-weight:700;color:var(--dim);margin:14px 0 6px}
+  input,select{width:100%;background:var(--card2);border:1px solid var(--line);
+    border-radius:14px;color:var(--text);padding:12px 14px;font-size:16px;outline:none}
+  input:focus{border-color:var(--accent)}
+  .row2{display:flex;gap:10px}.row2>*{flex:1}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{padding:9px 13px;border-radius:12px;background:var(--card2);border:1px solid var(--line);
+    color:var(--dim);font-size:13.5px;font-weight:600;cursor:pointer}
+  .chip.sel{background:var(--accent-dim);border-color:var(--accent);color:var(--accent)}
+  .times{display:flex;flex-direction:column;gap:8px}
+  .times .trow{display:flex;gap:8px}
+  .times input{flex:1}
+  .times .rm{width:46px;flex:none;background:var(--card2);border:1px solid var(--line);
+    border-radius:14px;color:var(--red);cursor:pointer}
+  .link{background:none;border:none;color:var(--accent);font-size:14px;font-weight:600;
+    cursor:pointer;padding:8px 0}
+  .primary{width:100%;background:var(--accent);color:#052e16;border:none;border-radius:16px;
+    padding:15px;font-size:16px;font-weight:800;margin-top:20px;cursor:pointer}
+  .danger{width:100%;background:none;border:none;color:var(--red);padding:14px;
+    font-size:14px;font-weight:600;cursor:pointer}
+  .toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(100px + env(safe-area-inset-bottom));
+    background:var(--card2);border:1px solid var(--line);color:var(--text);padding:10px 18px;
+    border-radius:14px;font-size:14px;z-index:20;opacity:0;transition:opacity .25s;pointer-events:none}
+  .toast.show{opacity:1}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Курс<span>.</span></h1>
+    <button class="icon-btn" id="bellBtn" title="Уведомления">🔔</button>
+  </header>
+  <main id="view"></main>
+</div>
+
+<button class="fab" id="fab">+</button>
+
+<nav><div class="row">
+  <button data-tab="today" class="sel"><span class="i">☀️</span>Сегодня</button>
+  <button data-tab="meds"><span class="i">💊</span>Аптечка</button>
+  <button data-tab="history"><span class="i">📈</span>История</button>
+</div></nav>
+
+<div class="overlay" id="overlay"><div class="sheet" id="sheet"></div></div>
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+/* ---------- state ---------- */
+const LS = 'kurs.v1';
+const COLORS = ['#4ade80','#60a5fa','#f472b6','#fbbf24','#a78bfa','#34d399','#fb923c'];
+const DAYS = ['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const FORMS = { tab:'табл.', cap:'капс.', drop:'капли', ml:'мл', inj:'укол', other:'приём' };
+
+let db = load();
+function load(){
+  try { return Object.assign({meds:[],log:{},notify:false}, JSON.parse(localStorage.getItem(LS)||'{}')); }
+  catch(e){ return {meds:[],log:{},notify:false}; }
+}
+function save(){ localStorage.setItem(LS, JSON.stringify(db)); }
+
+let tab = 'today';
+const $ = s => document.querySelector(s);
+
+/* ---------- date helpers ---------- */
+const dkey = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const today = () => dkey(new Date());
+const dow = d => (d.getDay()+6)%7; // Пн=0
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function parseK(k){ const [y,m,dd]=k.split('-').map(Number); return new Date(y,m-1,dd); }
+
+/* ---------- schedule core ---------- */
+function activeOn(med, date){
+  const start = parseK(med.start);
+  const d0 = new Date(date.getFullYear(),date.getMonth(),date.getDate());
+  if (d0 < start) return false;
+  if (med.duration){
+    const diff = Math.round((d0-start)/864e5);
+    if (diff >= med.duration) return false;
+  }
+  if (med.days && med.days.length && !med.days.includes(dow(d0))) return false;
+  return true;
+}
+function dosesFor(date){
+  const out = [];
+  for (const m of db.meds)
+    if (activeOn(m,date))
+      for (const t of m.times) out.push({med:m, time:t, key:`${m.id}|${t}`});
+  return out.sort((a,b)=>a.time.localeCompare(b.time));
+}
+function getStatus(dateK, key){ return (db.log[dateK]||{})[key] || null; }
+function setStatus(dateK, key, val){
+  db.log[dateK] = db.log[dateK] || {};
+  const prev = db.log[dateK][key];
+  if (prev === val) { delete db.log[dateK][key]; val = null; }
+  else db.log[dateK][key] = val;
+  // stock
+  const med = db.meds.find(m => key.startsWith(m.id+'|'));
+  if (med && med.stock != null){
+    if (val==='t' && prev!=='t') med.stock = Math.max(0, med.stock - 1);
+    if (val!=='t' && prev==='t') med.stock += 1;
+  }
+  save(); render();
+}
+function dayStats(dateK){
+  const date = parseK(dateK);
+  const doses = dosesFor(date);
+  const now = new Date();
+  let due=0, taken=0;
+  for (const d of doses){
+    const t = new Date(date); const [h,mi]=d.time.split(':'); t.setHours(+h,+mi,0,0);
+    const st = getStatus(dateK, d.key);
+    if (st==='t'){ taken++; due++; }
+    else if (st==='s'){ due++; }
+    else if (t <= now){ due++; }
+  }
+  return {total:doses.length, due, taken};
+}
+function streak(){
+  let s=0, d=new Date();
+  for(let i=0;i<365;i++){
+    const st = dayStats(dkey(d));
+    if (st.due>0){
+      if (st.taken===st.due) s++;
+      else if (i>0) break; // сегодня недобранный день стрик не рвёт
+    }
+    d = addDays(d,-1);
+  }
+  return s;
+}
+
+/* ---------- render ---------- */
+function render(){
+  document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('sel', b.dataset.tab===tab));
+  $('#fab').style.display = tab==='history' ? 'none' : '';
+  $('#bellBtn').classList.toggle('on', db.notify && Notification?.permission==='granted');
+  const v = $('#view');
+  if (tab==='today') v.innerHTML = renderToday();
+  else if (tab==='meds') v.innerHTML = renderMeds();
+  else v.innerHTML = renderHistory();
+}
+
+function renderToday(){
+  const k = today(), doses = dosesFor(new Date());
+  if (!doses.length) return emptyState('☀️','Нет приёмов на сегодня','Добавь лекарство кнопкой « + »');
+  const st = dayStats(k);
+  const pct = st.due ? Math.round(st.taken/st.due*100) : 100;
+  const nowHM = new Date().toTimeString().slice(0,5);
+  let html = `
+  <div class="card hero">
+    ${ring(pct)}
+    <div><div class="big">${st.taken} / ${st.total}</div><div class="muted">приёмов сегодня</div></div>
+    <div class="streak"><div class="big">🔥 ${streak()}</div><div class="muted">дней подряд</div></div>
+  </div>`;
+  let lastT = '';
+  for (const d of doses){
+    if (d.time !== lastT){ html += `<div class="tlabel">${d.time}</div>`; lastT = d.time; }
+    const s = getStatus(k, d.key);
+    const late = !s && d.time < nowHM;
+    html += `
+    <div class="dose ${s==='t'?'taken':''}">
+      <div class="dot" style="background:${d.med.color}"></div>
+      <div class="info">
+        <div class="name">${esc(d.med.name)}</div>
+        <div class="sub">${esc(d.med.dose||'')} ${FORMS[d.med.form]||''}${late?' · <span class="late">пора принять</span>':''}</div>
+      </div>
+      <div class="act">
+        <button class="yes ${s==='t'?'sel':''}" onclick="setStatus('${k}','${d.key}','t')">✓</button>
+        <button class="no ${s==='s'?'sel':''}" onclick="setStatus('${k}','${d.key}','s')">✕</button>
+      </div>
+    </div>`;
+  }
+  return html;
+}
+
+function ring(pct){
+  const r=30, c=2*Math.PI*r, off=c*(1-pct/100);
+  return `<svg class="ring" viewBox="0 0 76 76">
+    <circle cx="38" cy="38" r="${r}" fill="none" stroke="var(--card2)" stroke-width="8"/>
+    <circle cx="38" cy="38" r="${r}" fill="none" stroke="var(--accent)" stroke-width="8"
+      stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"
+      transform="rotate(-90 38 38)"/>
+    <text x="38" y="43" text-anchor="middle" fill="var(--text)" font-size="16" font-weight="800">${pct}%</text>
+  </svg>`;
+}
+
+function renderMeds(){
+  if (!db.meds.length) return emptyState('💊','Аптечка пуста','Добавь первое лекарство — курс займёт 30 секунд');
+  return db.meds.map(m=>{
+    let course='', barPct=null;
+    if (m.duration){
+      const day = Math.min(m.duration, Math.floor((new Date()-parseK(m.start))/864e5)+1);
+      if (day > 0){ course = `день ${day} из ${m.duration}`; barPct = Math.min(100, day/m.duration*100); }
+      else course = `старт ${m.start}`;
+    } else course = 'постоянный приём';
+    const sched = (m.days && m.days.length && m.days.length<7)
+      ? m.days.map(i=>DAYS[i]).join(', ') : 'каждый день';
+    const low = m.stock!=null && m.stock <= m.times.length*3;
+    return `
+    <div class="card med" onclick="openForm('${m.id}')">
+      <div class="pill-ic">💊</div>
+      <div style="flex:1;min-width:0">
+        <div class="name" style="font-weight:700">${esc(m.name)}</div>
+        <div class="muted">${esc(m.dose||'')} ${FORMS[m.form]||''} · ${m.times.join(', ')} · ${sched}</div>
+        <div class="muted" style="margin-top:4px">${course}${m.stock!=null?` · осталось ${m.stock}`:''}</div>
+        ${barPct!=null?`<div class="bar"><i style="width:${barPct}%"></i></div>`:''}
+        ${low?`<div class="warn">⚠️ Запас заканчивается — пора купить</div>`:''}
+      </div>
+      <div class="dot" style="background:${m.color};width:10px;height:10px;border-radius:50%"></div>
+    </div>`;
+  }).join('');
+}
+
+function renderHistory(){
+  if (!db.meds.length) return emptyState('📈','Пока нечего показывать','История появится после первых отметок');
+  const cells=[]; let sumT=0, sumD=0;
+  const start = addDays(new Date(), -27);
+  for (let i=0;i<28;i++){
+    const d = addDays(start,i), k = dkey(d), st = dayStats(k);
+    sumT += st.taken; sumD += st.due;
+    let bg='var(--card2)', col='var(--dim)';
+    if (st.due>0){
+      const p = st.taken/st.due;
+      bg = p===1 ? 'var(--accent)' : p>=.5 ? '#2f6b46' : p>0 ? '#5c4a2e' : '#3a2020';
+      col = p===1 ? '#052e16' : 'var(--text)';
+    }
+    cells.push(`<div class="cell" style="background:${bg};color:${col}" title="${k}: ${st.taken}/${st.due}">${d.getDate()}</div>`);
+  }
+  const pct = sumD ? Math.round(sumT/sumD*100) : 0;
+  const verdict = pct>=90?'Отличная дисциплина. Так держать!':pct>=70?'Хорошо, но есть пропуски — чаще всего их видно в один и тот же час.':'Курс под угрозой: больше четверти приёмов мимо. Включи уведомления 🔔';
+  return `
+  <div class="card hero">${ring(pct)}
+    <div><div class="big">${pct}%</div><div class="muted">дисциплина за 4 недели</div></div></div>
+  <div class="card"><div class="muted" style="margin-bottom:4px">Последние 28 дней</div>
+    <div class="grid">${cells.join('')}</div></div>
+  <div class="card"><b>Коуч:</b> <span class="muted" style="font-size:14px">${verdict}</span></div>`;
+}
+
+function emptyState(e,t,s){ return `<div class="empty"><div class="emoji">${e}</div><b>${t}</b><div class="muted" style="margin-top:6px">${s}</div></div>`; }
+function esc(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ---------- form ---------- */
+let editId = null;
+function openForm(id){
+  editId = id || null;
+  const m = id ? db.meds.find(x=>x.id===id) : null;
+  const days = m?.days || [];
+  $('#sheet').innerHTML = `
+    <h2>${m?'Изменить':'Новое лекарство'}</h2>
+    <label>Название</label>
+    <input id="f-name" placeholder="Например, Магний B6" value="${m?esc(m.name):''}">
+    <div class="row2">
+      <div><label>Доза</label><input id="f-dose" placeholder="1" value="${m?esc(m.dose||''):''}"></div>
+      <div><label>Форма</label><select id="f-form">
+        ${Object.entries(FORMS).map(([k,v])=>`<option value="${k}" ${m?.form===k?'selected':''}>${v}</option>`).join('')}
+      </select></div>
+    </div>
+    <label>Время приёма</label>
+    <div class="times" id="f-times">${(m?.times||['09:00']).map(t=>timeRow(t)).join('')}</div>
+    <button class="link" onclick="addTime()">+ добавить время</button>
+    <label>Дни недели <span style="font-weight:400">(пусто = каждый день)</span></label>
+    <div class="chips" id="f-days">
+      ${DAYS.map((d,i)=>`<span class="chip ${days.includes(i)?'sel':''}" data-i="${i}" onclick="this.classList.toggle('sel')">${d}</span>`).join('')}
+    </div>
+    <div class="row2">
+      <div><label>Старт курса</label><input id="f-start" type="date" value="${m?.start||today()}"></div>
+      <div><label>Длительность, дней</label><input id="f-dur" type="number" inputmode="numeric" placeholder="∞" value="${m?.duration||''}"></div>
+    </div>
+    <label>Остаток в упаковке <span style="font-weight:400">(необязательно)</span></label>
+    <input id="f-stock" type="number" inputmode="numeric" placeholder="Например, 30" value="${m?.stock??''}">
+    <button class="primary" onclick="saveForm()">${m?'Сохранить':'Начать курс'}</button>
+    ${m?`<button class="danger" onclick="delMed('${m.id}')">Удалить лекарство</button>`:''}
+  `;
+  $('#overlay').classList.add('open');
+}
+function timeRow(t){ return `<div class="trow"><input type="time" value="${t}"><button class="rm" onclick="this.parentNode.remove()">✕</button></div>`; }
+function addTime(){ $('#f-times').insertAdjacentHTML('beforeend', timeRow('21:00')); }
+function saveForm(){
+  const name = $('#f-name').value.trim();
+  if (!name) { toast('Введи название'); return; }
+  const times = [...document.querySelectorAll('#f-times input')].map(i=>i.value).filter(Boolean).sort();
+  if (!times.length){ toast('Добавь хотя бы одно время'); return; }
+  const days = [...document.querySelectorAll('#f-days .chip.sel')].map(c=>+c.dataset.i);
+  const stock = $('#f-stock').value;
+  const med = {
+    id: editId || 'm'+Date.now(),
+    name, dose: $('#f-dose').value.trim(), form: $('#f-form').value,
+    times, days, start: $('#f-start').value || today(),
+    duration: +$('#f-dur').value || null,
+    stock: stock==='' ? null : +stock,
+    color: editId ? db.meds.find(m=>m.id===editId).color : COLORS[db.meds.length % COLORS.length]
+  };
+  if (editId) db.meds = db.meds.map(m=>m.id===editId?med:m);
+  else db.meds.push(med);
+  save(); closeSheet(); render();
+  if (!editId && !db.notify) askNotify();
+}
+function delMed(id){
+  if (!confirm('Удалить лекарство и его расписание?')) return;
+  db.meds = db.meds.filter(m=>m.id!==id);
+  save(); closeSheet(); render();
+}
+function closeSheet(){ $('#overlay').classList.remove('open'); }
+
+/* ---------- notifications ---------- */
+async function askNotify(){
+  if (!('Notification' in window)) { toast('Уведомления не поддерживаются'); return; }
+  const p = await Notification.requestPermission();
+  db.notify = p==='granted'; save(); render();
+  toast(db.notify ? 'Уведомления включены 🔔' : 'Уведомления отклонены');
+}
+const notified = new Set(JSON.parse(sessionStorage.getItem('kurs.ntf')||'[]'));
+function tick(){
+  if (!db.notify || Notification.permission!=='granted') return;
+  const k = today(), nowHM = new Date().toTimeString().slice(0,5);
+  for (const d of dosesFor(new Date())){
+    const id = k+d.key;
+    if (d.time === nowHM && !getStatus(k,d.key) && !notified.has(id)){
+      notified.add(id);
+      sessionStorage.setItem('kurs.ntf', JSON.stringify([...notified]));
+      notify(`${d.time} — ${d.med.name}`, `${d.med.dose||''} ${FORMS[d.med.form]||''}. Отметь приём в приложении.`);
+    }
+  }
+}
+async function notify(title, body){
+  try {
+    const reg = await navigator.serviceWorker?.getRegistration();
+    if (reg) return reg.showNotification(title, {body, icon:'icon.svg', badge:'icon.svg', tag:title});
+  } catch(e){}
+  try { new Notification(title, {body}); } catch(e){}
+}
+setInterval(tick, 20000);
+
+/* ---------- misc ---------- */
+function toast(msg){
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  setTimeout(()=>t.classList.remove('show'), 2200);
+}
+document.querySelectorAll('nav button').forEach(b=>b.onclick = ()=>{ tab=b.dataset.tab; render(); });
+$('#fab').onclick = ()=>openForm();
+$('#bellBtn').onclick = askNotify;
+$('#overlay').onclick = e=>{ if (e.target.id==='overlay') closeSheet(); };
+window.setStatus = setStatus; window.openForm = openForm; window.addTime = addTime;
+window.saveForm = saveForm; window.delMed = delMed;
+
+if ('serviceWorker' in navigator)
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+
+render();
+setInterval(()=>{ if(tab==='today') render(); }, 60000);
+</script>
+</body>
+</html>
